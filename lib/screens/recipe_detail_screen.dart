@@ -166,68 +166,140 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
       backgroundColor: AppColors.background,
       body: CustomScrollView(
         slivers: [
-          // AppBar expansível com imagem
+          // AppBar expansível com imagem modernizado
           SliverAppBar(
-            expandedHeight: 200,
+            expandedHeight: 280,
             pinned: true,
-            backgroundColor: AppColors.primary,
-            foregroundColor: AppColors.textOnPrimary,
+            backgroundColor: AppColors.surface,
+            foregroundColor: AppColors.textPrimary,
+            elevation: 0,
             flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                widget.receita.titulo,
-                style: AppTextStyles.h5.copyWith(
-                  color: AppColors.textOnPrimary,
-                ),
-              ),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      AppColors.primary,
-                      AppColors.primaryDark,
-                    ],
+              title: null,
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Imagem de fundo com gradiente
+                  Container(
+                    decoration: const BoxDecoration(
+                      gradient: AppColors.primaryGradient,
+                    ),
+                    child: widget.receita.urlImagem != null
+                        ? Image.network(
+                            widget.receita.urlImagem!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return _buildDefaultImage();
+                            },
+                          )
+                        : _buildDefaultImage(),
                   ),
-                ),
-                child: widget.receita.urlImagem != null
-                    ? Image.network(
-                        widget.receita.urlImagem!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return _buildDefaultImage();
-                        },
-                      )
-                    : _buildDefaultImage(),
-              ),
-            ),
-            actions: [
-              IconButton(
-                icon: Icon(
-                  _isFavorite ? Icons.favorite : Icons.favorite_border,
-                  color: _isFavorite ? AppColors.error : AppColors.textOnPrimary,
-                ),
-                onPressed: _toggleFavorite,
-                tooltip: _isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos',
-              ),
-              PopupMenuButton<String>(
-                onSelected: (value) {
-                  if (value == 'delete') {
-                    _showDeleteDialog();
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
+                  // Overlay gradiente para melhor legibilidade
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.7),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Título posicionado na parte inferior
+                  Positioned(
+                    left: 20,
+                    right: 20,
+                    bottom: 20,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.delete, color: AppColors.error),
-                        SizedBox(width: 8),
-                        Text('Excluir receita'),
+                        Text(
+                          widget.receita.titulo,
+                          style: AppTextStyles.h2.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            shadows: [
+                              Shadow(
+                                offset: const Offset(0, 2),
+                                blurRadius: 4,
+                                color: Colors.black.withValues(alpha: 0.5),
+                              ),
+                            ],
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            _buildHeaderChip(
+                              icon: Icons.access_time,
+                              label: widget.receita.tempoPreparo,
+                            ),
+                            const SizedBox(width: 12),
+                            _buildHeaderChip(
+                              icon: Icons.restaurant,
+                              label: '${widget.receita.porcoes} porções',
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
                 ],
+              ),
+            ),
+            actions: [
+              // Botão de favorito estilizado
+              Container(
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  icon: Icon(
+                    _isFavorite ? Icons.favorite : Icons.favorite_border,
+                    color: _isFavorite ? AppColors.error : Colors.white,
+                    size: 24,
+                  ),
+                  onPressed: _toggleFavorite,
+                  tooltip: _isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos',
+                ),
+              ),
+              // Menu de opções estilizado
+              Container(
+                margin: const EdgeInsets.only(right: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: PopupMenuButton<String>(
+                  icon: const Icon(
+                    Icons.more_vert,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                  onSelected: (value) {
+                    if (value == 'delete') {
+                      _showDeleteDialog();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, color: AppColors.error),
+                          SizedBox(width: 8),
+                          Text('Excluir receita'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -236,13 +308,13 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Column(
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Informações básicas
+                  // Informações básicas modernizadas
                   _buildInfoCards(),
                   
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
                   
                   // Descrição
                   _buildSection(
@@ -320,7 +392,9 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
 
   Widget _buildDefaultImage() {
     return Container(
-      color: AppColors.primary,
+      decoration: const BoxDecoration(
+        gradient: AppColors.primaryGradient,
+      ),
       child: const Center(
         child: Icon(
           Icons.restaurant_menu,
@@ -331,33 +405,74 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
     );
   }
 
+  Widget _buildHeaderChip({
+    required IconData icon,
+    required String label,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: AppTextStyles.labelSmall.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildInfoCards() {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildInfoCard(
-            icon: Icons.access_time,
-            title: 'Tempo',
-            value: widget.receita.tempoPreparo,
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildInfoCard(
+              icon: Icons.access_time,
+              title: 'Tempo',
+              value: widget.receita.tempoPreparo,
+              color: AppColors.primary,
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildInfoCard(
-            icon: Icons.restaurant,
-            title: 'Porções',
-            value: '${widget.receita.porcoes}',
+          const SizedBox(width: 16),
+          Expanded(
+            child: _buildInfoCard(
+              icon: Icons.restaurant,
+              title: 'Porções',
+              value: '${widget.receita.porcoes}',
+              color: AppColors.accent,
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildInfoCard(
-            icon: Icons.list_alt,
-            title: 'Ingredientes',
-            value: '${widget.receita.ingredientes.length}',
+          const SizedBox(width: 16),
+          Expanded(
+            child: _buildInfoCard(
+              icon: Icons.list_alt,
+              title: 'Ingredientes',
+              value: '${widget.receita.ingredientes.length}',
+              color: AppColors.success,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -365,32 +480,50 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
     required IconData icon,
     required String title,
     required String value,
+    required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowMedium,
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          Icon(
-            icon,
-            color: AppColors.primary,
-            size: 24,
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 24,
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             title,
-            style: AppTextStyles.labelSmall,
+            style: AppTextStyles.labelMedium.copyWith(
+              color: AppColors.textSecondary,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: AppTextStyles.labelLarge.copyWith(
-              fontWeight: FontWeight.w600,
+            style: AppTextStyles.h5.copyWith(
+              fontWeight: FontWeight.w700,
+              color: color,
             ),
             textAlign: TextAlign.center,
           ),
