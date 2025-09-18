@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_text_styles.dart';
+import '../core/theme/responsive_breakpoints.dart';
 import '../models/receita.dart';
 import '../services/receitas_service.dart';
 
@@ -336,302 +337,374 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen> {
             ),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header com imagem placeholder/preview
-              Container(
+      body: ResponsiveBuilder(
+        builder: (context, deviceType) {
+          return Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              child: ResponsiveContainer(
+                child: _buildFormContent(context, deviceType),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFormContent(BuildContext context, DeviceType deviceType) {
+    if (deviceType == DeviceType.desktop) {
+      // Layout de duas colunas para desktop
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Coluna esquerda - Imagem e informações básicas
+          Expanded(
+            flex: 1,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildImageSection(),
+                const SizedBox(height: 32),
+                _buildBasicInfoSection(),
+              ],
+            ),
+          ),
+          const SizedBox(width: 32),
+          // Coluna direita - Ingredientes e modo de preparo
+          Expanded(
+            flex: 1,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildIngredientsSection(),
+                const SizedBox(height: 32),
+                _buildPreparationSection(),
+                const SizedBox(height: 32),
+                _buildSaveButton(),
+              ],
+            ),
+          ),
+        ],
+      );
+    } else {
+      // Layout vertical para mobile/tablet
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildImageSection(),
+          const SizedBox(height: 32),
+          _buildBasicInfoSection(),
+          const SizedBox(height: 32),
+          _buildTimePortionsSection(),
+          const SizedBox(height: 32),
+          _buildIngredientsSection(),
+          const SizedBox(height: 32),
+          _buildPreparationSection(),
+          const SizedBox(height: 32),
+          _buildSaveButton(),
+          const SizedBox(height: 16),
+        ],
+      );
+    }
+  }
+
+  Widget _buildImageSection() {
+    return Container(
+      height: 200,
+      decoration: BoxDecoration(
+        gradient: _selectedImage == null ? AppColors.primaryGradient : null,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Stack(
+        children: [
+          // Imagem selecionada ou placeholder
+          if (_selectedImage != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Image.file(
+                File(_selectedImage!.path),
+                width: double.infinity,
                 height: 200,
-                decoration: BoxDecoration(
-                  gradient: _selectedImage == null ? AppColors.primaryGradient : null,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Stack(
-                  children: [
-                    // Imagem selecionada ou placeholder
-                    if (_selectedImage != null)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: Image.file(
-                          File(_selectedImage!.path),
-                          width: double.infinity,
-                          height: 200,
-                          fit: BoxFit.cover,
-                        ),
-                      )
-                    else
-                      Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.add_a_photo,
-                              size: 48,
-                              color: AppColors.textOnPrimary.withValues(alpha: 0.7),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Adicionar foto',
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                color: AppColors.textOnPrimary.withValues(alpha: 0.9),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    
-                    // Overlay para editar imagem
-                    if (_selectedImage != null)
-                      Positioned(
-                        top: 16,
-                        right: 16,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.edit,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    
-                    // Botão para selecionar/trocar imagem
-                    Positioned.fill(
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: _selecionarImagem,
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                fit: BoxFit.cover,
               ),
-              
-              const SizedBox(height: 32),
-              // Título
-              _buildSectionTitle('Informações Básicas'),
-              const SizedBox(height: 16),
-              
-              TextFormField(
-                controller: _tituloController,
-                decoration: const InputDecoration(
-                  labelText: 'Título da receita',
-                  hintText: 'Ex: Bolo de chocolate',
-                  prefixIcon: Icon(Icons.title),
-                ),
-                style: AppTextStyles.bodyLarge,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Por favor, digite o título da receita';
-                  }
-                  return null;
-                },
-              ),
-              
-              const SizedBox(height: 20),
-              
-              // Descrição
-              TextFormField(
-                controller: _descricaoController,
-                decoration: const InputDecoration(
-                  labelText: 'Descrição',
-                  hintText: 'Descreva brevemente sua receita',
-                  prefixIcon: Icon(Icons.description),
-                  alignLabelWithHint: true,
-                ),
-                style: AppTextStyles.bodyLarge,
-                maxLines: 3,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Por favor, digite uma descrição';
-                  }
-                  return null;
-                },
-              ),
-              
-              const SizedBox(height: 32),
-              
-              // Informações básicas em cards
-              Row(
+            )
+          else
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.shadow,
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: TextFormField(
-                        controller: _tempoPreparoController,
-                        decoration: const InputDecoration(
-                          labelText: 'Tempo de preparo',
-                          hintText: 'Ex: 30 min',
-                          prefixIcon: Icon(Icons.access_time),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(16)),
-                            borderSide: BorderSide(color: AppColors.primary, width: 2),
-                          ),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                        ),
-                        style: AppTextStyles.bodyLarge,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Digite o tempo';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
+                  Icon(
+                    Icons.add_a_photo,
+                    size: 48,
+                    color: AppColors.textOnPrimary.withValues(alpha: 0.7),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.shadow,
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: TextFormField(
-                        controller: _porcoesController,
-                        decoration: const InputDecoration(
-                          labelText: 'Porções',
-                          hintText: 'Ex: 4',
-                          prefixIcon: Icon(Icons.restaurant),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(16)),
-                            borderSide: BorderSide(color: AppColors.primary, width: 2),
-                          ),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                        ),
-                        style: AppTextStyles.bodyLarge,
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Digite as porções';
-                          }
-                          if (int.tryParse(value.trim()) == null) {
-                            return 'Digite um número';
-                          }
-                          return null;
-                        },
-                      ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Adicionar foto',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textOnPrimary.withValues(alpha: 0.9),
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
-              
-              const SizedBox(height: 24),
-              
-              // Ingredientes
-              _buildSectionTitle('Ingredientes'),
-              const SizedBox(height: 16),
-              
-              ...List.generate(_ingredientesControllers.length, (index) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _ingredientesControllers[index],
-                          decoration: InputDecoration(
-                            labelText: 'Ingrediente ${index + 1}',
-                            hintText: 'Ex: 2 xícaras de farinha',
-                          ),
-                        ),
-                      ),
-                      if (_ingredientesControllers.length > 1)
-                        IconButton(
-                          icon: const Icon(Icons.remove_circle_outline),
-                          color: AppColors.error,
-                          onPressed: () => _removerIngrediente(index),
-                        ),
-                    ],
-                  ),
-                );
-              }),
-              
-              const SizedBox(height: 8),
-              
-              OutlinedButton.icon(
-                onPressed: _adicionarIngrediente,
-                icon: const Icon(Icons.add),
-                label: const Text('Adicionar ingrediente'),
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Modo de preparo
-              _buildSectionTitle('Modo de Preparo'),
-              const SizedBox(height: 16),
-              
-              TextFormField(
-                controller: _modoPreparoController,
-                decoration: const InputDecoration(
-                  labelText: 'Instruções de preparo',
-                  hintText: 'Descreva passo a passo como preparar a receita...',
-                  alignLabelWithHint: true,
+            ),
+          
+          // Overlay para editar imagem
+          if (_selectedImage != null)
+            Positioned(
+              top: 16,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                maxLines: 8,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Por favor, digite o modo de preparo';
-                  }
-                  return null;
-                },
+                child: const Icon(
+                  Icons.edit,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
-              
-              const SizedBox(height: 32),
-              
-              // Botão de salvar
-              ElevatedButton(
-                onPressed: _isLoading ? null : _salvarReceita,
-                child: _isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.textOnPrimary,
-                          ),
-                        ),
-                      )
-                    : const Text('Criar receita'),
+            ),
+          
+          // Botão para selecionar/trocar imagem
+          Positioned.fill(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _selecionarImagem,
+                borderRadius: BorderRadius.circular(24),
               ),
-              
-              const SizedBox(height: 16),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildBasicInfoSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildSectionTitle('Informações Básicas'),
+        const SizedBox(height: 16),
+        
+        TextFormField(
+          controller: _tituloController,
+          decoration: const InputDecoration(
+            labelText: 'Título da receita',
+            hintText: 'Ex: Bolo de chocolate',
+            prefixIcon: Icon(Icons.title),
+          ),
+          style: AppTextStyles.bodyLarge,
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Por favor, digite o título da receita';
+            }
+            return null;
+          },
+        ),
+        
+        const SizedBox(height: 20),
+        
+        TextFormField(
+          controller: _descricaoController,
+          decoration: const InputDecoration(
+            labelText: 'Descrição',
+            hintText: 'Descreva brevemente sua receita',
+            prefixIcon: Icon(Icons.description),
+            alignLabelWithHint: true,
+          ),
+          style: AppTextStyles.bodyLarge,
+          maxLines: 3,
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Por favor, digite uma descrição';
+            }
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimePortionsSection() {
+    return Row(
+      children: [
+        Expanded(child: _buildTimeField()),
+        const SizedBox(width: 16),
+        Expanded(child: _buildPortionsField()),
+      ],
+    );
+  }
+
+  Widget _buildTimeField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextFormField(
+        controller: _tempoPreparoController,
+        decoration: const InputDecoration(
+          labelText: 'Tempo de preparo',
+          hintText: 'Ex: 30 min',
+          prefixIcon: Icon(Icons.access_time),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+            borderSide: BorderSide(color: AppColors.primary, width: 2),
+          ),
+          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        ),
+        style: AppTextStyles.bodyLarge,
+        validator: (value) {
+          if (value == null || value.trim().isEmpty) {
+            return 'Digite o tempo';
+          }
+          return null;
+        },
+      ),
+    );
+  }
+
+  Widget _buildPortionsField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextFormField(
+        controller: _porcoesController,
+        decoration: const InputDecoration(
+          labelText: 'Porções',
+          hintText: 'Ex: 4',
+          prefixIcon: Icon(Icons.restaurant),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+            borderSide: BorderSide(color: AppColors.primary, width: 2),
+          ),
+          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        ),
+        style: AppTextStyles.bodyLarge,
+        keyboardType: TextInputType.number,
+        validator: (value) {
+          if (value == null || value.trim().isEmpty) {
+            return 'Digite as porções';
+          }
+          if (int.tryParse(value.trim()) == null) {
+            return 'Digite um número';
+          }
+          return null;
+        },
+      ),
+    );
+  }
+
+  Widget _buildIngredientsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildSectionTitle('Ingredientes'),
+        const SizedBox(height: 16),
+        
+        ...List.generate(_ingredientesControllers.length, (index) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _ingredientesControllers[index],
+                    decoration: InputDecoration(
+                      labelText: 'Ingrediente ${index + 1}',
+                      hintText: 'Ex: 2 xícaras de farinha',
+                    ),
+                  ),
+                ),
+                if (_ingredientesControllers.length > 1)
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline),
+                    color: AppColors.error,
+                    onPressed: () => _removerIngrediente(index),
+                  ),
+              ],
+            ),
+          );
+        }),
+        
+        const SizedBox(height: 8),
+        
+        OutlinedButton.icon(
+          onPressed: _adicionarIngrediente,
+          icon: const Icon(Icons.add),
+          label: const Text('Adicionar ingrediente'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPreparationSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildSectionTitle('Modo de Preparo'),
+        const SizedBox(height: 16),
+        
+        TextFormField(
+          controller: _modoPreparoController,
+          decoration: const InputDecoration(
+            labelText: 'Instruções de preparo',
+            hintText: 'Descreva passo a passo como preparar a receita...',
+            alignLabelWithHint: true,
+          ),
+          maxLines: 8,
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Por favor, digite o modo de preparo';
+            }
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return ElevatedButton(
+      onPressed: _isLoading ? null : _salvarReceita,
+      child: _isLoading
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  AppColors.textOnPrimary,
+                ),
+              ),
+            )
+          : const Text('Criar receita'),
     );
   }
 

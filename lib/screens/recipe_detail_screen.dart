@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_text_styles.dart';
+import '../core/theme/responsive_breakpoints.dart';
 import '../models/receita.dart';
 import '../models/comentario.dart';
-import '../services/receitas_service.dart';
+import '../providers/receitas_provider.dart';
 
 class RecipeDetailScreen extends StatefulWidget {
   final Receita receita;
@@ -18,7 +20,6 @@ class RecipeDetailScreen extends StatefulWidget {
 }
 
 class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
-  final ReceitasService _receitasService = ReceitasService();
   final TextEditingController _comentarioController = TextEditingController();
   final TextEditingController _autorController = TextEditingController();
   bool _isFavorite = false;
@@ -28,34 +29,58 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
   @override
   void initState() {
     super.initState();
-    // Simulação de favorito (sempre false inicialmente)
-    _isFavorite = false;
     _carregarDados();
   }
 
-  void _carregarDados() {
-    _comentarios = _receitasService.getComentariosPorReceita(widget.receita.id);
-    _receitasRelacionadas = _receitasService.getReceitasRelacionadas(widget.receita.id);
+  void _carregarDados() async {
+    final receitasProvider = Provider.of<ReceitasProvider>(context, listen: false);
+
+    // Carregar comentários
+    _comentarios = await receitasProvider.getComentariosByReceita(widget.receita.id);
+
+    // Carregar favoritos
+    final favoritosIds = await receitasProvider.getFavoritosIds();
+    _isFavorite = favoritosIds.contains(widget.receita.id);
+
+    // Por enquanto, receitas relacionadas será uma lista vazia
+    _receitasRelacionadas = [];
+
+    setState(() {});
   }
 
   void _navegarParaTodasReceitas() {
     Navigator.pushNamed(context, '/home');
   }
 
-  void _toggleFavorite() {
-    setState(() {
-      _isFavorite = !_isFavorite;
-    });
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _isFavorite ? 'Receita adicionada aos favoritos!' : 'Receita removida dos favoritos!',
+  void _toggleFavorite() async {
+    final receitasProvider = Provider.of<ReceitasProvider>(context, listen: false);
+
+    final success = await receitasProvider.toggleFavorito(widget.receita.id);
+
+    if (!mounted) return;
+
+    if (success) {
+      setState(() {
+        _isFavorite = !_isFavorite;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _isFavorite ? 'Receita adicionada aos favoritos!' : 'Receita removida dos favoritos!',
+          ),
+          backgroundColor: _isFavorite ? AppColors.success : AppColors.textSecondary,
+          duration: const Duration(seconds: 2),
         ),
-        backgroundColor: _isFavorite ? AppColors.success : AppColors.textSecondary,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erro ao atualizar favorito'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _showDeleteDialog() {
@@ -70,16 +95,38 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
             child: const Text('Cancelar'),
           ),
           TextButton(
-            onPressed: () {
-              _receitasService.removerReceita(widget.receita.id);
-              Navigator.of(context).pop(); // Fechar dialog
-              Navigator.of(context).pop(); // Voltar para a lista
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Receita excluída com sucesso!'),
-                  backgroundColor: AppColors.success,
-                ),
-              );
+            onPressed: () async {
+              final receitasProvider = Provider.of<ReceitasProvider>(context, listen: false);
+              final success = await receitasProvider.deleteReceita(widget.receita.id);
+
+              if (!mounted) return;
+
+              if (success) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    Navigator.of(context).pop(); // Fechar dialog
+                    Navigator.of(context).pop(); // Voltar para a lista
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Receita excluída com sucesso!'),
+                        backgroundColor: AppColors.success,
+                      ),
+                    );
+                  }
+                });
+              } else {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    Navigator.of(context).pop(); // Fechar dialog
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Erro ao excluir receita'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                });
+              }
             },
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
             child: const Text('Excluir'),
@@ -125,32 +172,49 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
             child: const Text('Cancelar'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               if (_autorController.text.isNotEmpty && _comentarioController.text.isNotEmpty) {
-                final novoComentario = Comentario(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  receitaId: widget.receita.id,
-                  autor: _autorController.text,
-                  conteudo: _comentarioController.text,
-                  dataCriacao: DateTime.now(),
-                  avaliacao: 5, // Avaliação padrão
+                final receitasProvider = Provider.of<ReceitasProvider>(context, listen: false);
+
+                final success = await receitasProvider.createComentario(
+                  widget.receita.id,
+                  _comentarioController.text,
+                  // avaliacao: 5, // Por enquanto não implementei avaliação
                 );
-                
-                _receitasService.adicionarComentario(novoComentario);
-                setState(() {
-                  _comentarios = _receitasService.getComentariosPorReceita(widget.receita.id);
-                });
-                
-                _autorController.clear();
-                _comentarioController.clear();
-                Navigator.of(context).pop();
-                
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Comentário adicionado com sucesso!'),
-                    backgroundColor: AppColors.success,
-                  ),
-                );
+
+                if (!mounted) return;
+
+                if (success) {
+                  // Recarregar comentários
+                  _comentarios = await receitasProvider.getComentariosByReceita(widget.receita.id);
+                  setState(() {});
+
+                  _autorController.clear();
+                  _comentarioController.clear();
+
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Comentário adicionado!'),
+                          backgroundColor: AppColors.success,
+                        ),
+                      );
+                    }
+                  });
+                } else {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Erro ao adicionar comentário'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  });
+                }
               }
             },
             child: const Text('Adicionar'),
@@ -306,88 +370,158 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
           
           // Conteúdo da receita
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-                child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Informações básicas modernizadas
-                  _buildInfoCards(),
-                  
-                  const SizedBox(height: 32),
-                  
-                  // Descrição
-                  _buildSection(
-                    title: 'Descrição',
-                    child: Text(
-                      widget.receita.descricao,
-                      style: AppTextStyles.bodyLarge,
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Ingredientes
-                  _buildSection(
-                    title: 'Ingredientes',
-                    child: Column(
-                      children: widget.receita.ingredientes.map((ingrediente) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 6,
-                                height: 6,
-                                margin: const EdgeInsets.only(top: 8, right: 12),
-                                decoration: const BoxDecoration(
-                                  color: AppColors.primary,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  ingrediente,
-                                  style: AppTextStyles.bodyMedium,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Modo de preparo
-                  _buildSection(
-                    title: 'Modo de preparo',
-                    child: Text(
-                      widget.receita.modoPreparo,
-                      style: AppTextStyles.bodyLarge,
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Comentários
-                  _buildComentariosSection(),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Veja mais receitas
-                  _buildVejaMaisReceitasSection(),
-                  
-                  const SizedBox(height: 32),
-                ],
+            child: ResponsiveContainer(
+              child: ResponsiveBuilder(
+                builder: (context, deviceType) {
+                  return _buildRecipeContent(context, deviceType);
+                },
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildRecipeContent(BuildContext context, DeviceType deviceType) {
+    if (deviceType == DeviceType.desktop) {
+      // Layout de duas colunas para desktop
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Coluna esquerda - Informações principais
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildInfoCards(),
+                const SizedBox(height: 32),
+                _buildSection(
+                  title: 'Descrição',
+                  child: Text(
+                    widget.receita.descricao,
+                    style: AppTextStyles.bodyLarge,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _buildSection(
+                  title: 'Ingredientes',
+                  child: Column(
+                    children: widget.receita.ingredientes.map((ingrediente) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              margin: const EdgeInsets.only(top: 8, right: 12),
+                              decoration: const BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                ingrediente,
+                                style: AppTextStyles.bodyMedium,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _buildSection(
+                  title: 'Modo de preparo',
+                  child: Text(
+                    widget.receita.modoPreparo,
+                    style: AppTextStyles.bodyLarge,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 48),
+          // Coluna direita - Comentários e receitas relacionadas
+          Expanded(
+            flex: 1,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildComentariosSection(),
+                const SizedBox(height: 32),
+                _buildVejaMaisReceitasSection(),
+              ],
+            ),
+          ),
+        ],
+      );
+    } else {
+      // Layout vertical para mobile/tablet
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildInfoCards(),
+          const SizedBox(height: 32),
+          _buildSection(
+            title: 'Descrição',
+            child: Text(
+              widget.receita.descricao,
+              style: AppTextStyles.bodyLarge,
+            ),
+          ),
+          const SizedBox(height: 24),
+          _buildSection(
+            title: 'Ingredientes',
+            child: Column(
+              children: widget.receita.ingredientes.map((ingrediente) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        margin: const EdgeInsets.only(top: 8, right: 12),
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          ingrediente,
+                          style: AppTextStyles.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 24),
+          _buildSection(
+            title: 'Modo de preparo',
+            child: Text(
+              widget.receita.modoPreparo,
+              style: AppTextStyles.bodyLarge,
+            ),
+          ),
+          const SizedBox(height: 24),
+          _buildComentariosSection(),
+          const SizedBox(height: 24),
+          _buildVejaMaisReceitasSection(),
+          const SizedBox(height: 32),
+        ],
+      );
+    }
   }
 
   Widget _buildDefaultImage() {
@@ -441,38 +575,87 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
   }
 
   Widget _buildInfoCards() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildInfoCard(
-              icon: Icons.access_time,
-              title: 'Tempo',
-              value: widget.receita.tempoPreparo,
-              color: AppColors.primary,
+    return ResponsiveBuilder(
+      builder: (context, deviceType) {
+        if (deviceType == DeviceType.desktop) {
+          // Grid 3x1 para desktop com mais espaço
+          return Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildInfoCard(
+                      icon: Icons.access_time,
+                      title: 'Tempo',
+                      value: widget.receita.tempoPreparo,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: _buildInfoCard(
+                      icon: Icons.restaurant,
+                      title: 'Porções',
+                      value: '${widget.receita.porcoes}',
+                      color: AppColors.accent,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildInfoCard(
+                      icon: Icons.list_alt,
+                      title: 'Ingredientes',
+                      value: '${widget.receita.ingredientes.length}',
+                      color: AppColors.success,
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  const Expanded(child: SizedBox()), // Espaço vazio para manter alinhamento
+                ],
+              ),
+            ],
+          );
+        } else {
+          // Layout original para mobile/tablet
+          return Container(
+            margin: ResponsiveBreakpoints.getHorizontalPadding(context),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildInfoCard(
+                    icon: Icons.access_time,
+                    title: 'Tempo',
+                    value: widget.receita.tempoPreparo,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildInfoCard(
+                    icon: Icons.restaurant,
+                    title: 'Porções',
+                    value: '${widget.receita.porcoes}',
+                    color: AppColors.accent,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildInfoCard(
+                    icon: Icons.list_alt,
+                    title: 'Ingredientes',
+                    value: '${widget.receita.ingredientes.length}',
+                    color: AppColors.success,
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _buildInfoCard(
-              icon: Icons.restaurant,
-              title: 'Porções',
-              value: '${widget.receita.porcoes}',
-              color: AppColors.accent,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _buildInfoCard(
-              icon: Icons.list_alt,
-              title: 'Ingredientes',
-              value: '${widget.receita.ingredientes.length}',
-              color: AppColors.success,
-            ),
-          ),
-        ],
-      ),
+          );
+        }
+      },
     );
   }
 

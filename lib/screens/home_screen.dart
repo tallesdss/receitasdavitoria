@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_text_styles.dart';
+import '../core/theme/responsive_breakpoints.dart';
 import '../models/receita.dart';
-import '../services/receitas_service.dart';
+import '../providers/auth_provider.dart';
+import '../providers/receitas_provider.dart';
 import 'recipe_detail_screen.dart';
 import 'create_recipe_screen.dart';
 import 'login_screen.dart';
@@ -15,42 +18,21 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final ReceitasService _receitasService = ReceitasService();
   final TextEditingController _searchController = TextEditingController();
-  List<Receita> _receitasFiltradas = [];
 
   @override
   void initState() {
     super.initState();
-    _receitasFiltradas = _receitasService.receitas;
-    _receitasService.addListener(_atualizarLista);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final receitasProvider = Provider.of<ReceitasProvider>(context, listen: false);
+      receitasProvider.loadInitialData();
+    });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
-    _receitasService.removeListener(_atualizarLista);
     super.dispose();
-  }
-
-  void _atualizarLista() {
-    setState(() {
-      if (_searchController.text.isEmpty) {
-        _receitasFiltradas = _receitasService.receitas;
-      } else {
-        _receitasFiltradas = _receitasService.buscarReceitasPorTitulo(_searchController.text);
-      }
-    });
-  }
-
-  void _buscarReceitas(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        _receitasFiltradas = _receitasService.receitas;
-      } else {
-        _receitasFiltradas = _receitasService.buscarReceitasPorTitulo(query);
-      }
-    });
   }
 
   void _navegarParaDetalhe(Receita receita) {
@@ -69,11 +51,21 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _logout() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-      (route) => false,
-    );
+  void _buscarReceitas(String query) {
+    final receitasProvider = Provider.of<ReceitasProvider>(context, listen: false);
+    receitasProvider.setSearchQuery(query.isEmpty ? null : query);
+  }
+
+  void _logout() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    await authProvider.signOut();
+
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -127,11 +119,17 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    'Olá, Vitória!',
-                                    style: AppTextStyles.bodyMedium.copyWith(
-                                      color: AppColors.textOnPrimary.withValues(alpha: 0.9),
-                                    ),
+                                  Consumer<AuthProvider>(
+                                    builder: (context, authProvider, _) {
+                                      final user = authProvider.currentUser;
+                                      final nome = user?.userMetadata?['nome'] ?? 'Usuário';
+                                      return Text(
+                                        'Olá, $nome!',
+                                        style: AppTextStyles.bodyMedium.copyWith(
+                                          color: AppColors.textOnPrimary.withValues(alpha: 0.9),
+                                        ),
+                                      );
+                                    },
                                   ),
                                   Text(
                                     'Receitas da Vitória',
@@ -193,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // Barra de pesquisa
           SliverToBoxAdapter(
             child: Container(
-              margin: const EdgeInsets.all(20),
+              margin: ResponsiveBreakpoints.getPadding(context),
               child: Container(
                 decoration: BoxDecoration(
                   color: AppColors.surface,
@@ -267,23 +265,67 @@ class _HomeScreenState extends State<HomeScreen> {
             child: _buildCategoriasRapidas(),
           ),
           
-          // Lista de receitas
+          // Lista de receitas responsiva
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            sliver: _receitasFiltradas.isEmpty
-                ? SliverToBoxAdapter(child: _buildEmptyState())
-                : SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final receita = _receitasFiltradas[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: _buildRecipeCard(receita),
-                        );
-                      },
-                      childCount: _receitasFiltradas.length,
+            padding: ResponsiveBreakpoints.getHorizontalPadding(context),
+            sliver: Consumer<ReceitasProvider>(
+              builder: (context, receitasProvider, _) {
+                final receitas = receitasProvider.receitas;
+
+                if (receitasProvider.isLoading) {
+                  return const SliverToBoxAdapter(
+                    child: Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: CircularProgressIndicator(),
+                      ),
                     ),
-                  ),
+                  );
+                }
+
+                if (receitas.isEmpty) {
+                  return SliverToBoxAdapter(child: _buildEmptyState());
+                }
+
+                return ResponsiveBuilder(
+                  builder: (context, deviceType) {
+                    if (deviceType == DeviceType.mobile) {
+                      // Lista vertical para mobile
+                      return SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final receita = receitas[index];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: _buildRecipeCard(receita),
+                            );
+                          },
+                          childCount: receitas.length,
+                        ),
+                      );
+                    } else {
+                      // Grid para tablet/desktop
+                      final columns = ResponsiveBreakpoints.getGridColumns(context);
+                      return SliverGrid(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: columns,
+                          childAspectRatio: deviceType == DeviceType.desktop ? 0.8 : 0.75,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final receita = receitas[index];
+                            return _buildRecipeCard(receita, isGrid: true);
+                          },
+                          childCount: receitas.length,
+                        ),
+                      );
+                    }
+                  },
+                );
+              },
+            ),
           ),
           
           // Espaçamento final
@@ -292,18 +334,45 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _navegarParaCriarReceita,
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.textOnPrimary,
-        tooltip: 'Nova receita',
-        icon: const Icon(Icons.add),
-        label: Text(
-          'Nova receita',
-          style: AppTextStyles.buttonSmall.copyWith(
-            color: AppColors.textOnPrimary,
-          ),
-        ),
+      floatingActionButton: ResponsiveBuilder(
+        builder: (context, deviceType) {
+          if (deviceType == DeviceType.mobile) {
+            return FloatingActionButton.extended(
+              onPressed: _navegarParaCriarReceita,
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.textOnPrimary,
+              tooltip: 'Nova receita',
+              icon: const Icon(Icons.add),
+              label: Text(
+                'Nova receita',
+                style: AppTextStyles.buttonSmall.copyWith(
+                  color: AppColors.textOnPrimary,
+                ),
+              ),
+            );
+          } else {
+            // Para desktop/tablet, usar um botão maior
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16, right: 16),
+              child: FloatingActionButton.extended(
+                onPressed: _navegarParaCriarReceita,
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.textOnPrimary,
+                tooltip: 'Nova receita',
+                icon: const Icon(Icons.add, size: 24),
+                label: Text(
+                  'Nova receita',
+                  style: AppTextStyles.labelLarge.copyWith(
+                    color: AppColors.textOnPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                elevation: 8,
+                highlightElevation: 12,
+              ),
+            );
+          }
+        },
       ),
     );
   }
@@ -438,7 +507,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildRecipeCard(Receita receita) {
+  Widget _buildRecipeCard(Receita receita, {bool isGrid = false}) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -460,7 +529,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             // Imagem da receita (placeholder com gradiente)
             Container(
-              height: 160,
+              height: isGrid ? 140 : 160,
               decoration: BoxDecoration(
                 gradient: AppColors.primaryGradient,
                 borderRadius: const BorderRadius.vertical(
@@ -520,7 +589,7 @@ class _HomeScreenState extends State<HomeScreen> {
             
             // Conteúdo do card
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(isGrid ? 16 : 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -550,35 +619,72 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 16),
                   
                   // Informações adicionais
-                  Row(
-                    children: [
-                      _buildInfoChip(
-                        icon: Icons.restaurant,
-                        label: '${receita.porcoes} porções',
-                        color: AppColors.accent,
-                      ),
-                      const SizedBox(width: 12),
-                      _buildInfoChip(
-                        icon: Icons.list_alt,
-                        label: '${receita.ingredientes.length} ingredientes',
-                        color: AppColors.success,
-                      ),
-                      const Spacer(),
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
+                  if (isGrid) 
+                    // Layout compacto para grid
+                    Column(
+                      children: [
+                        Row(
+                          children: [
+                            _buildInfoChip(
+                              icon: Icons.restaurant,
+                              label: '${receita.porcoes}',
+                              color: AppColors.accent,
+                            ),
+                            const SizedBox(width: 8),
+                            _buildInfoChip(
+                              icon: Icons.list_alt,
+                              label: '${receita.ingredientes.length}',
+                              color: AppColors.success,
+                            ),
+                            const Spacer(),
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.arrow_forward,
+                                size: 16,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
                         ),
-                        child: Icon(
-                          Icons.arrow_forward,
-                          size: 18,
-                          color: AppColors.primary,
+                      ],
+                    )
+                  else
+                    // Layout padrão para lista
+                    Row(
+                      children: [
+                        _buildInfoChip(
+                          icon: Icons.restaurant,
+                          label: '${receita.porcoes} porções',
+                          color: AppColors.accent,
                         ),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 12),
+                        _buildInfoChip(
+                          icon: Icons.list_alt,
+                          label: '${receita.ingredientes.length} ingredientes',
+                          color: AppColors.success,
+                        ),
+                        const Spacer(),
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.arrow_forward,
+                            size: 18,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),

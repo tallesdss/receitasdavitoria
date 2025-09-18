@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_text_styles.dart';
+import '../core/theme/responsive_breakpoints.dart';
+import '../providers/auth_provider.dart';
 import 'home_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -29,19 +32,45 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _handleRegister() {
-    if (_formKey.currentState!.validate() && _acceptTerms) {
-      // Simulação de cadastro - qualquer dados são aceitos
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
-      );
-    } else if (!_acceptTerms) {
+  void _handleRegister() async {
+    if (!_acceptTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Você deve aceitar os termos e condições'),
           backgroundColor: AppColors.error,
         ),
       );
+      return;
+    }
+
+    if (_formKey.currentState!.validate()) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+      final success = await authProvider.signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        nome: _nameController.text.trim(),
+      );
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Conta criada com sucesso! Verifique seu e-mail para confirmar a conta.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+      } else if (mounted && authProvider.errorMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(authProvider.errorMessage!),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -55,13 +84,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         elevation: 0,
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+        child: Center(
+          child: SingleChildScrollView(
+            child: ResponsiveContainer(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                 // Título e descrição
                 Text(
                   'Cadastre-se',
@@ -250,7 +280,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   },
                   child: const Text('Já tenho uma conta'),
                 ),
-              ],
+                  ],
+                ),
+              ),
             ),
           ),
         ),
