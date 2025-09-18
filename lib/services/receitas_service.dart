@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/receita.dart';
+import '../models/comentario.dart';
 
 class ReceitasService extends ChangeNotifier {
   static final ReceitasService _instance = ReceitasService._internal();
@@ -72,6 +73,34 @@ class ReceitasService extends ChangeNotifier {
     ),
   ];
 
+  // Lista de comentários fake
+  final List<Comentario> _comentarios = [
+    Comentario(
+      id: '1',
+      receitaId: '1',
+      autor: 'Maria Silva',
+      conteudo: 'Receita maravilhosa! Ficou exatamente como esperado. Recomendo!',
+      dataCriacao: DateTime.now().subtract(const Duration(hours: 2)),
+      avaliacao: 5,
+    ),
+    Comentario(
+      id: '2',
+      receitaId: '1',
+      autor: 'João Santos',
+      conteudo: 'Muito fácil de fazer e ficou delicioso. Minha família adorou!',
+      dataCriacao: DateTime.now().subtract(const Duration(days: 1)),
+      avaliacao: 4,
+    ),
+    Comentario(
+      id: '3',
+      receitaId: '2',
+      autor: 'Ana Costa',
+      conteudo: 'Bolo ficou fofinho e saboroso. Vou fazer novamente!',
+      dataCriacao: DateTime.now().subtract(const Duration(hours: 5)),
+      avaliacao: 5,
+    ),
+  ];
+
   List<Receita> get receitas => List.unmodifiable(_receitas);
 
   void adicionarReceita(Receita receita) {
@@ -109,5 +138,41 @@ class ReceitasService extends ChangeNotifier {
   void limparTodasReceitas() {
     _receitas.clear();
     notifyListeners();
+  }
+
+  // Métodos para comentários
+  List<Comentario> getComentariosPorReceita(String receitaId) {
+    return _comentarios
+        .where((comentario) => comentario.receitaId == receitaId)
+        .toList()
+      ..sort((a, b) => b.dataCriacao.compareTo(a.dataCriacao));
+  }
+
+  void adicionarComentario(Comentario comentario) {
+    _comentarios.add(comentario);
+    notifyListeners();
+  }
+
+  void removerComentario(String id) {
+    _comentarios.removeWhere((comentario) => comentario.id == id);
+    notifyListeners();
+  }
+
+  // Métodos para receitas relacionadas
+  List<Receita> getReceitasRelacionadas(String receitaId, {int limite = 3}) {
+    final receitaAtual = buscarReceitaPorId(receitaId);
+    if (receitaAtual == null) return [];
+
+    // Simula receitas relacionadas baseadas em palavras-chave similares
+    final palavrasChave = receitaAtual.titulo.toLowerCase().split(' ');
+    
+    return _receitas
+        .where((receita) => receita.id != receitaId)
+        .where((receita) {
+          final tituloReceita = receita.titulo.toLowerCase();
+          return palavrasChave.any((palavra) => tituloReceita.contains(palavra));
+        })
+        .take(limite)
+        .toList();
   }
 }
