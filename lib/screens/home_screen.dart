@@ -9,6 +9,7 @@ import '../providers/receitas_provider.dart';
 import 'recipe_detail_screen.dart';
 import 'create_recipe_screen.dart';
 import 'login_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -96,22 +97,31 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Row(
                           children: [
-                            // Avatar do usuário
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: AppColors.textOnPrimary.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: AppColors.textOnPrimary.withValues(alpha: 0.3),
-                                  width: 2,
+                            // Avatar do usuário (clicável)
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => const ProfileScreen(),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: AppColors.textOnPrimary.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: AppColors.textOnPrimary.withValues(alpha: 0.3),
+                                    width: 2,
+                                  ),
                                 ),
-                              ),
-                              child: const Icon(
-                                Icons.person,
-                                color: AppColors.textOnPrimary,
-                                size: 24,
+                                child: const Icon(
+                                  Icons.person,
+                                  color: AppColors.textOnPrimary,
+                                  size: 24,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 16),

@@ -21,7 +21,6 @@ class RecipeDetailScreen extends StatefulWidget {
 
 class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
   final TextEditingController _comentarioController = TextEditingController();
-  final TextEditingController _autorController = TextEditingController();
   bool _isFavorite = false;
   List<Comentario> _comentarios = [];
   List<Receita> _receitasRelacionadas = [];
@@ -145,27 +144,20 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
-              controller: _autorController,
-              decoration: const InputDecoration(
-                labelText: 'Seu nome',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
               controller: _comentarioController,
               decoration: const InputDecoration(
-                labelText: 'Comentário',
+                labelText: 'Seu comentário',
                 border: OutlineInputBorder(),
+                hintText: 'Compartilhe sua opinião sobre esta receita...',
               ),
-              maxLines: 3,
+              maxLines: 4,
+              autofocus: true,
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () {
-              _autorController.clear();
               _comentarioController.clear();
               Navigator.of(context).pop();
             },
@@ -173,12 +165,12 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
           ),
           TextButton(
             onPressed: () async {
-              if (_autorController.text.isNotEmpty && _comentarioController.text.isNotEmpty) {
+              if (_comentarioController.text.trim().isNotEmpty) {
                 final receitasProvider = Provider.of<ReceitasProvider>(context, listen: false);
 
                 final success = await receitasProvider.createComentario(
                   widget.receita.id,
-                  _comentarioController.text,
+                  _comentarioController.text.trim(),
                   // avaliacao: 5, // Por enquanto não implementei avaliação
                 );
 
@@ -189,7 +181,6 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                   _comentarios = await receitasProvider.getComentariosByReceita(widget.receita.id);
                   setState(() {});
 
-                  _autorController.clear();
                   _comentarioController.clear();
 
                   WidgetsBinding.instance.addPostFrameCallback((_) {

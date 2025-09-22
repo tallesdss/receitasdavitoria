@@ -78,6 +78,7 @@ class ReceitasService extends ChangeNotifier {
     Comentario(
       id: '1',
       receitaId: '1',
+      usuarioId: 'user1',
       autor: 'Maria Silva',
       conteudo: 'Receita maravilhosa! Ficou exatamente como esperado. Recomendo!',
       dataCriacao: DateTime.now().subtract(const Duration(hours: 2)),
@@ -86,6 +87,7 @@ class ReceitasService extends ChangeNotifier {
     Comentario(
       id: '2',
       receitaId: '1',
+      usuarioId: 'user2',
       autor: 'João Santos',
       conteudo: 'Muito fácil de fazer e ficou delicioso. Minha família adorou!',
       dataCriacao: DateTime.now().subtract(const Duration(days: 1)),
@@ -94,6 +96,7 @@ class ReceitasService extends ChangeNotifier {
     Comentario(
       id: '3',
       receitaId: '2',
+      usuarioId: 'user3',
       autor: 'Ana Costa',
       conteudo: 'Bolo ficou fofinho e saboroso. Vou fazer novamente!',
       dataCriacao: DateTime.now().subtract(const Duration(hours: 5)),
