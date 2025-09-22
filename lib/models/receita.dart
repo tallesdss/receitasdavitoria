@@ -39,15 +39,21 @@ class Receita {
   // Criar a partir de Map
   factory Receita.fromMap(Map<String, dynamic> map) {
     return Receita(
-      id: map['id'],
-      titulo: map['titulo'],
-      descricao: map['descricao'],
-      ingredientes: List<String>.from(map['ingredientes']),
-      modoPreparo: map['modoPreparo'],
-      tempoPreparo: map['tempoPreparo'],
-      porcoes: map['porcoes'],
-      urlImagem: map['urlImagem'],
-      dataCriacao: DateTime.parse(map['dataCriacao']),
+      id: map['id']?.toString() ?? '',
+      titulo: map['titulo']?.toString() ?? '',
+      descricao: map['descricao']?.toString() ?? '',
+      ingredientes: map['ingredientes'] is List 
+          ? List<String>.from(map['ingredientes']) 
+          : <String>[],
+      modoPreparo: map['modoPreparo']?.toString() ?? map['modo_preparo']?.toString() ?? '',
+      tempoPreparo: map['tempoPreparo']?.toString() ?? map['tempo_preparo']?.toString() ?? '',
+      porcoes: map['porcoes'] is int ? map['porcoes'] : int.tryParse(map['porcoes']?.toString() ?? '0') ?? 0,
+      urlImagem: map['urlImagem']?.toString() ?? map['url_imagem']?.toString(),
+      dataCriacao: map['dataCriacao'] is String 
+          ? DateTime.parse(map['dataCriacao'])
+          : map['data_criacao'] is String
+              ? DateTime.parse(map['data_criacao'])
+              : DateTime.now(),
     );
   }
 

@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/theme/app_colors.dart';
@@ -33,6 +33,7 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen> {
   // Image picker
   final ImagePicker _picker = ImagePicker();
   XFile? _selectedImage;
+  Uint8List? _imageBytes;
   
   bool _isLoading = false;
 
@@ -190,8 +191,12 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen> {
       );
       
       if (image != null) {
+        // Carregar os bytes da imagem para compatibilidade com web
+        final bytes = await image.readAsBytes();
+        
         setState(() {
           _selectedImage = image;
+          _imageBytes = bytes;
         });
         
         if (mounted) {
@@ -419,11 +424,11 @@ class _CreateRecipeScreenState extends State<CreateRecipeScreen> {
       child: Stack(
         children: [
           // Imagem selecionada ou placeholder
-          if (_selectedImage != null)
+          if (_selectedImage != null && _imageBytes != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(24),
-              child: Image.file(
-                File(_selectedImage!.path),
+              child: Image.memory(
+                _imageBytes!,
                 width: double.infinity,
                 height: 200,
                 fit: BoxFit.cover,

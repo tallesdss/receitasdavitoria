@@ -18,7 +18,7 @@ class DatabaseService {
           .from('receitas')
           .select('''
             *,
-            usuarios!inner(nome, email),
+            usuarios(nome, email),
             categorias(id, nome, cor, icone)
           ''')
           .order('data_criacao', ascending: false);
@@ -71,7 +71,7 @@ class DatabaseService {
           .from('receitas')
           .select('''
             *,
-            usuarios!inner(nome, email),
+            usuarios(nome, email),
             categorias(id, nome, cor, icone),
             ingredientes(id, nome, quantidade, unidade, ordem),
             passos_preparo(id, passo, ordem, tempo_estimado),
@@ -80,7 +80,7 @@ class DatabaseService {
               conteudo,
               avaliacao,
               data_criacao,
-              usuarios!inner(nome)
+              usuarios(nome)
             )
           ''')
           .eq('id', id)
@@ -275,7 +275,7 @@ class DatabaseService {
           .from('comentarios')
           .select('''
             *,
-            usuarios!inner(nome, email)
+            usuarios(nome, email)
           ''')
           .eq('receita_id', receitaId)
           .order('data_criacao', ascending: false);
@@ -398,7 +398,7 @@ class DatabaseService {
           .from('receitas')
           .select('''
             *,
-            usuarios!inner(nome, email),
+            usuarios(nome, email),
             categorias(id, nome, cor, icone),
             ingredientes(id, nome, quantidade, unidade, ordem),
             passos_preparo(id, passo, ordem, tempo_estimado)
